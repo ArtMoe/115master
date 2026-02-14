@@ -36,16 +36,28 @@ interface VideoCoverBase {
  * 视频封面原始数据
  */
 export type VideoCoverRaw = VideoCoverBase & {
-  /** 图片 blob */
+  /** 缩略图 blob */
   blob: Blob
+  /** 原图 blob */
+  originalBlob: Blob
+  /** 原图宽度 */
+  originalWidth: number
+  /** 原图高度 */
+  originalHeight: number
 }
 
 /**
  * 视频封面数据
  */
 export type VideoCover = VideoCoverBase & {
-  /** 图片 blob URL */
+  /** 缩略图 blob URL */
   img: string
+  /** 原图 blob URL */
+  originalImg: string
+  /** 原图宽度 */
+  originalWidth: number
+  /** 原图高度 */
+  originalHeight: number
 }
 
 /**
@@ -97,8 +109,8 @@ const getCacheKey = (sha1: string, time: number): string => `${sha1}_${time}`
  * @returns 视频封面时间点数组
  */
 function calculateVideoCoverTimes(duration: number, coverNum: number): number[] {
-  /** 偏移量 */
-  const offset = duration / 5
+  /** 偏移量（15%） */
+  const offset = duration * 0.15
   /** 获取最小时间 */
   const minTime = offset
   /** 获取最大时间 */
@@ -117,7 +129,13 @@ function calculateVideoCoverTimes(duration: number, coverNum: number): number[] 
 function toDisplayableData(rawData: VideoCoverRaw): VideoCover {
   return {
     img: URL.createObjectURL(rawData.blob),
-    ...rawData,
+    originalImg: URL.createObjectURL(rawData.originalBlob),
+    width: rawData.width,
+    height: rawData.height,
+    originalWidth: rawData.originalWidth,
+    originalHeight: rawData.originalHeight,
+    frameTime: rawData.frameTime,
+    seekTime: rawData.seekTime,
   }
 }
 
@@ -131,23 +149,24 @@ async function generateVideoCoverRaw(clipper: M3U8ClipperNew, time: number): Pro
     throw new Error('no clipper result')
   }
 
-  /** 缩放 */
+  const originalWidth = result.videoFrame.displayWidth
+  const originalHeight = result.videoFrame.displayHeight
+
+  /** 生成缩略图（720p） */
   const resize = getImageResize(
-    result.videoFrame.displayWidth,
-    result.videoFrame.displayHeight,
+    originalWidth,
+    originalHeight,
     MAX_WIDTH,
     MAX_HEIGHT,
   )
 
-  /** 使用 OffscreenCanvas */
-  const canvas = new OffscreenCanvas(resize.width, resize.height)
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
+  const thumbnailCanvas = new OffscreenCanvas(resize.width, resize.height)
+  const thumbnailCtx = thumbnailCanvas.getContext('2d')
+  if (!thumbnailCtx) {
     throw new Error('no canvas context')
   }
 
-  // 绘制
-  ctx.drawImage(
+  thumbnailCtx.drawImage(
     await createImageBitmap(result.videoFrame, {
       resizeQuality: 'pixelated',
       resizeWidth: resize.width,
@@ -159,10 +178,29 @@ async function generateVideoCoverRaw(clipper: M3U8ClipperNew, time: number): Pro
     resize.height,
   )
 
-  /** 转换成 blob */
-  const blob = await canvas.convertToBlob({
+  const blob = await thumbnailCanvas.convertToBlob({
     type: 'image/webp',
     quality: 0.85,
+  })
+
+  /** 生成原图 */
+  const originalCanvas = new OffscreenCanvas(originalWidth, originalHeight)
+  const originalCtx = originalCanvas.getContext('2d')
+  if (!originalCtx) {
+    throw new Error('no canvas context for original')
+  }
+
+  originalCtx.drawImage(
+    await createImageBitmap(result.videoFrame),
+    0,
+    0,
+    originalWidth,
+    originalHeight,
+  )
+
+  const originalBlob = await originalCanvas.convertToBlob({
+    type: 'image/webp',
+    quality: 0.9,
   })
 
   // 关闭
@@ -171,8 +209,11 @@ async function generateVideoCoverRaw(clipper: M3U8ClipperNew, time: number): Pro
   /** 缓存 blob 数据 */
   const raw: VideoCoverRaw = {
     blob,
+    originalBlob,
     width: resize.width,
     height: resize.height,
+    originalWidth,
+    originalHeight,
     frameTime: result.frameTime,
     seekTime: time,
   }
@@ -232,10 +273,13 @@ async function getVideoCover(sha1: string, pickCode: string, times: number[]): P
 /**
  * 清理 blob URL
  */
-function cleanupBlobUrl(covers: string[]): void {
+function cleanupBlobUrl(covers: VideoCover[]): void {
   covers.forEach((cover) => {
-    if (cover.startsWith('blob:')) {
-      URL.revokeObjectURL(cover)
+    if (cover.img?.startsWith('blob:')) {
+      URL.revokeObjectURL(cover.img)
+    }
+    if (cover.originalImg?.startsWith('blob:')) {
+      URL.revokeObjectURL(cover.originalImg)
     }
   })
 }
@@ -388,11 +432,7 @@ export function useSmartVideoCover(options: Ref<VideoCoverOptions>, config: Smar
   /** 卸载 */
   onUnmounted(() => {
     videoCoverScheduler.remove(taskId)
-    cleanupBlobUrl(
-      videoCover.state
-        .map(item => item?.img)
-        .filter(item => item !== undefined),
-    )
+    cleanupBlobUrl(videoCover.state)
   })
 
   return {

@@ -162,7 +162,7 @@ const missAV = new MissAV()
 const styles = clsx({
   // 容器样式
   container: {
-    main: 'h-24 w-full px-20',
+    main: 'h-32 w-full px-20',
     content: 'group relative flex h-full items-center gap-1',
   },
   // 状态样式
@@ -172,7 +172,7 @@ const styles = clsx({
   },
   // 封面样式
   cover: {
-    container: 'flex h-24 w-36 items-center justify-center',
+    container: 'flex h-32 w-48 items-center justify-center',
     link: 'block h-full w-full',
   },
   // 主要内容样式

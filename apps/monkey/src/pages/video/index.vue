@@ -97,7 +97,7 @@
     </div>
 
     <!-- 页面下方内容 -->
-    <div v-if="PLUS_VERSION" :class="styles.container.pageFlow">
+    <div v-if="PLUS_VERSION && movieInfoEnabled" :class="styles.container.pageFlow">
       <!-- 电影信息 -->
       <MovieInfo :movie-infos="DataMovieInfo" />
     </div>
@@ -159,6 +159,7 @@ import { getAvNumber } from '@/utils/getNumber'
 import { appLogger } from '@/utils/logger'
 import { isMac } from '@/utils/platform'
 import { goToPlayer } from '@/utils/route'
+import { userSettings } from '@/utils/userSettings'
 import { webLinkIINA, webLinkShortcutsMpv } from '@/utils/weblink'
 import About from './components/About/index.vue'
 import { FileActionMenu } from './components/FileActionMenu'
@@ -299,6 +300,10 @@ const hasNext = computed(() => {
     return undefined
   }
   return currentPlaylistIndex.value < DataPlaylist.state.data.length - 1
+})
+/** 电影信息是否启用 */
+const movieInfoEnabled = computed(() => {
+  return userSettings.value.plusFeatures.enableMovieInfo
 })
 
 /**

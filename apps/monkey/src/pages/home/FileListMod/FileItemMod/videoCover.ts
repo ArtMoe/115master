@@ -4,6 +4,7 @@ import { PLUS_VERSION } from '@/constants'
 import ExtVideoCover from '@/pages/home/components/ExtVideoCover/index.vue'
 import { FileListType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
+import { userSettings } from '@/utils/userSettings'
 import { FileItemModBase } from './base'
 
 /**
@@ -20,8 +21,12 @@ export class FileItemModVideoCover extends FileItemModBase {
       return
     }
 
-    // 如果有番号并且是Plus版本，则不加载
-    if (this.itemInfo.avNumber && PLUS_VERSION) {
+    // 如果有番号并且是Plus版本并且启用了扩展信息，则不加载
+    if (
+      this.itemInfo.avNumber
+      && PLUS_VERSION
+      && userSettings.value.plusFeatures.enableExtInfo
+    ) {
       return
     }
 

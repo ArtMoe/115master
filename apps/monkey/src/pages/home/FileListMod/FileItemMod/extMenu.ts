@@ -116,6 +116,8 @@ export class FileItemModExtMenu extends FileItemModBase {
       const link = this.createNormalItemButtonElement(button)
       this.fileOprNode?.prepend(link)
       link.addEventListener('mousedown', async (e: MouseEvent) => {
+        // 只响应左键点击
+        if (e.button !== 0) return
         e.preventDefault()
         e.stopPropagation()
         e.stopImmediatePropagation()

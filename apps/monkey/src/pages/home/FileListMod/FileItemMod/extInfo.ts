@@ -4,6 +4,7 @@ import { createApp } from 'vue'
 import ExtInfo from '@/pages/home/components/ExtInfo/index.vue'
 import { FileListType, FileType, IvType } from '@/pages/home/types'
 import mainStyles from '@/styles/main.css?inline'
+import { userSettings } from '@/utils/userSettings'
 import { FileItemModBase } from './base'
 
 /**
@@ -14,8 +15,13 @@ export class FileItemModExtInfo extends FileItemModBase {
   readonly ENABLE_KEY_IN_USER_SETTING = 'enableFilelistPreview'
 
   private vueApp: App | null = null
+  private unwatchPlusFeature: (() => void) | null = null
 
   onLoad() {
+    if (!this.isPlusFeatureEnabled()) {
+      return
+    }
+
     // 如果文件列表类型为网格，则不加载扩展信息
     if (this.itemInfo.fileListType === FileListType.grid) {
       return
@@ -33,6 +39,8 @@ export class FileItemModExtInfo extends FileItemModBase {
     if (!this.itemInfo.avNumber) {
       return
     }
+
+    this.watchPlusFeature()
 
     this.itemNode.classList.add('with-ext-info')
 
@@ -64,9 +72,29 @@ export class FileItemModExtInfo extends FileItemModBase {
   }
 
   onDestroy() {
+    if (this.unwatchPlusFeature) {
+      this.unwatchPlusFeature()
+      this.unwatchPlusFeature = null
+    }
+
     /** 延迟卸载 Vue，避免阻塞新的文件列表加载 */
     defer(() => {
       this.vueApp?.unmount()
+    })
+  }
+
+  private isPlusFeatureEnabled(): boolean {
+    return userSettings.value.plusFeatures.enableExtInfo
+  }
+
+  private watchPlusFeature() {
+    if (this.unwatchPlusFeature) {
+      return
+    }
+    this.unwatchPlusFeature = userSettings.watch('plusFeatures', () => {
+      if (!this.isPlusFeatureEnabled()) {
+        this.destroy()
+      }
     })
   }
 }

@@ -24,11 +24,16 @@
           :class="[styles.cover.thumbItem]"
           @click.prevent.stop="openPhotoSwipe(index)"
         >
-          <img
-            :src="thumbnail.img"
-            :alt="`视频封面 ${index + 1}`"
-            :class="styles.cover.thumbImage"
-          >
+          <div :class="styles.cover.thumbWrapper">
+            <img
+              :src="thumbnail.img"
+              :alt="`视频封面 ${index + 1}`"
+              :class="styles.cover.thumbImage"
+            >
+            <div :class="styles.cover.timeOverlay">
+              {{ formatTime(thumbnail.seekTime) }}
+            </div>
+          </div>
         </a>
       </div>
     </div>
@@ -51,13 +56,13 @@ const props = defineProps<{
 }>()
 
 /** 文件列表视频封面数量 */
-const FILELIST_VIDEO_COVER_NUM = 5
+const FILELIST_VIDEO_COVER_NUM = 8
 
 /** 样式常量定义 */
 const styles = clsx({
   // 容器样式
   container: {
-    main: 'h-24 w-full max-w-214 px-20 [content-visibility:auto]',
+    main: 'h-32 w-full max-w-495 px-20 [content-visibility:auto]',
     content:
       'bg-base-300 relative flex h-full items-center overflow-hidden rounded',
   },
@@ -78,7 +83,16 @@ const styles = clsx({
       'cursor-zoom-in no-underline',
       'transition-opacity hover:opacity-90',
     ],
+    thumbWrapper: [
+      'relative h-full w-full',
+    ],
     thumbImage: ['h-full w-full object-contain object-center align-top'],
+    timeOverlay: [
+      'absolute bottom-1 right-1',
+      'bg-black/70 text-white text-xs px-1.5 py-0.5 rounded',
+      'font-mono leading-none',
+      'pointer-events-none',
+    ],
   },
 })
 
@@ -107,6 +121,19 @@ const config = {
 /** smart 视频封面 hook */
 const { videoCover } = useSmartVideoCover(options, config)
 
+/** 格式化时间 */
+function formatTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  } else {
+    return `${minutes}:${secs.toString().padStart(2, '0')}`
+  }
+}
+
 /** 初始化 PhotoSwipe */
 function initPhotoSwipe() {
   if (lightbox.value) {
@@ -116,9 +143,9 @@ function initPhotoSwipe() {
 
   lightbox.value = new PhotoSwipeLightbox({
     dataSource: videoCover.state.map(item => ({
-      src: item.img,
-      width: item.width,
-      height: item.height,
+      src: item.originalImg,
+      width: item.originalWidth,
+      height: item.originalHeight,
       alt: '视频封面',
     })),
     showHideAnimationType: 'fade',

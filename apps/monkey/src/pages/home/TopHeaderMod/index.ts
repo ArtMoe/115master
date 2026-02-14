@@ -1,9 +1,14 @@
 import type { TopRootSearchParams } from '@/pages/home/global'
+import type { App } from 'vue'
 import { unsafeWindow } from '$'
+import { createApp } from 'vue'
+import { PLUS_VERSION } from '@/constants'
 import { BaseMod } from '@/pages/home/BaseMod'
 import { getUrlParams } from '@/utils/url'
 import { userSettings } from '@/utils/userSettings'
 import { openOfflineTask } from './openOfflineTask'
+import mainStyles from '@/styles/main.css?inline'
+import PlusControlPanel from '@/components/PlusControlPanel/PlusControlPanel.vue'
 import './index.css'
 import 'iconify-icon'
 
@@ -14,8 +19,12 @@ import 'iconify-icon'
  * 2. 删除官方的云下载按钮
  * 3. 云下载按钮免除刷新重定向
  * 4. 添加预览切换开关
+ * 5. 添加Plus控制面板按钮
  */
 export class TopHeaderMod extends BaseMod {
+  private controlPanelApp: App | null = null
+  private controlPanelContainer: HTMLElement | null = null
+
   constructor() {
     super()
     this.init()
@@ -28,7 +37,9 @@ export class TopHeaderMod extends BaseMod {
   }
 
   /** 销毁 */
-  destroy() {}
+  destroy() {
+    this.destroyControlPanel()
+  }
 
   /** 初始化 */
   private init() {
@@ -40,11 +51,12 @@ export class TopHeaderMod extends BaseMod {
     if (params.mode === 'search') {
       return
     }
-    this.deleteOfficialDownloadButton()
-    this.addMasterOfflineTaskButton()
+
     this.addPreviewSwitchButton()
-    this.fixContextMenuPosition('upload_btn_add_dir')
-    this.fixContextMenuPosition('create_new_add_dir')
+    if (PLUS_VERSION) {
+      this.addPlusControlPanelButton()
+    }
+
   }
 
   /** 删除官方的离线任务按钮 */
@@ -94,16 +106,17 @@ export class TopHeaderMod extends BaseMod {
     if (value) {
       button.classList.add('active')
     }
-    button.setAttribute('title', '开启文件预览')
+    button.setAttribute('title', value ? '关闭文件预览' : '开启文件预览')
     button.href = 'javascript:void(0)'
     button.innerHTML = `
-      <iconify-icon class="preview-off" icon="material-symbols:preview-off" noobserver></iconify-icon>
-      <iconify-icon class="preview-on" icon="material-symbols:preview" noobserver></iconify-icon>
+      <iconify-icon class="preview-off" icon="material-symbols:image-outline" noobserver></iconify-icon>
+      <iconify-icon class="preview-on" icon="material-symbols:image" noobserver></iconify-icon>
     `
     button.onclick = () => {
       userSettings.value.enableFilelistPreview
         = !userSettings.value.enableFilelistPreview
-      button.classList.toggle('active')
+      const isActive = button.classList.toggle('active')
+      button.setAttribute('title', isActive ? '关闭文件预览' : '开启文件预览')
     }
     return button
   }
@@ -120,5 +133,67 @@ export class TopHeaderMod extends BaseMod {
       return
     const tabRect = tabNode.getBoundingClientRect()
     contextMenuNode.style.left = `${tabRect.left}px`
+  }
+
+  /** 添加Plus控制面板按钮 */
+  private addPlusControlPanelButton() {
+    const button = this.createPlusControlPanelButton()
+    this.topHeaderNode?.append(button)
+  }
+
+  /** 创建Plus控制面板按钮 */
+  private createPlusControlPanelButton() {
+    const button = document.createElement('a')
+    button.classList.add('button', 'btn-line', 'master-plus-control-btn')
+    button.setAttribute('title', 'Plus 功能控制面板')
+    button.href = 'javascript:void(0)'
+    button.innerHTML = `
+      <iconify-icon icon="material-symbols:tune" noobserver></iconify-icon>
+    `
+    button.onclick = () => {
+      this.showControlPanel()
+    }
+    return button
+  }
+
+  /** 显示控制面板 */
+  private showControlPanel() {
+    if (this.controlPanelApp) {
+      return
+    }
+
+    this.controlPanelContainer = document.createElement('div')
+    this.controlPanelContainer.className = 'master-plus-control-panel-root'
+    document.body.appendChild(this.controlPanelContainer)
+
+    const shadowRoot = this.controlPanelContainer.attachShadow({ mode: 'open' })
+
+    const styleElement = document.createElement('style')
+    styleElement.textContent = mainStyles
+    shadowRoot.appendChild(styleElement)
+
+    const mountPoint = document.createElement('div')
+    mountPoint.setAttribute('data-theme', 'light')
+    shadowRoot.appendChild(mountPoint)
+
+    this.controlPanelApp = createApp(PlusControlPanel, {
+      onClose: () => {
+        this.destroyControlPanel()
+      },
+    })
+
+    this.controlPanelApp.mount(mountPoint)
+  }
+
+  /** 销毁控制面板 */
+  private destroyControlPanel() {
+    if (this.controlPanelApp) {
+      this.controlPanelApp.unmount()
+      this.controlPanelApp = null
+    }
+    if (this.controlPanelContainer) {
+      this.controlPanelContainer.remove()
+      this.controlPanelContainer = null
+    }
   }
 }

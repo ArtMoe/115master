@@ -4,11 +4,21 @@ import { GM_getValue, GM_setValue } from '$'
 interface Settings {
   /** 启动文件列表预览 */
   enableFilelistPreview: boolean
+  plusFeatures: {
+    enableExtInfo: boolean
+    enableActressInfo: boolean
+    enableMovieInfo: boolean
+  }
 }
 
 /** 默认设置 */
 const DEFAULT_SETTINGS: Settings = {
   enableFilelistPreview: true,
+  plusFeatures: {
+    enableExtInfo: true,
+    enableActressInfo: true,
+    enableMovieInfo: true,
+  },
 }
 
 /** 监听任务接口 */
@@ -54,14 +64,39 @@ export class UserSettings {
   private create() {
     const namespace = 'USER_SETTINGS'
     const value = GM_getValue(namespace) ?? {}
-    const userSettings = { ...DEFAULT_SETTINGS, ...value }
-    const proxy = new Proxy(userSettings, {
-      get: (target, key) => {
-        return target[key]
+    const storedSettings = value as Partial<Settings>
+    const userSettings: Settings = {
+      ...DEFAULT_SETTINGS,
+      ...storedSettings,
+      plusFeatures: {
+        ...DEFAULT_SETTINGS.plusFeatures,
+        ...(storedSettings.plusFeatures || {}),
       },
-      set: (target, key, newValue) => {
+    }
+
+    const plusFeaturesProxy = new Proxy(userSettings.plusFeatures, {
+      set: (target, key: keyof Settings['plusFeatures'], newValue) => {
         const oldValue = target[key]
         target[key] = newValue
+        GM_setValue(namespace, userSettings)
+        this.watchTasks.forEach((task) => {
+          if (task.key === 'plusFeatures') {
+            task.callback(oldValue, userSettings.plusFeatures)
+          }
+        })
+        return true
+      },
+    })
+
+    userSettings.plusFeatures = plusFeaturesProxy
+
+    const proxy = new Proxy(userSettings, {
+      get: (target, key) => {
+        return target[key as keyof Settings]
+      },
+      set: (target, key, newValue) => {
+        const oldValue = target[key as keyof Settings]
+        ;(target as any)[key] = newValue
         GM_setValue(namespace, target)
         // 触发相关的watch回调
         this.watchTasks.forEach((task) => {
